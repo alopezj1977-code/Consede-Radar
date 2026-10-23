@@ -1,0 +1,219 @@
+{
+  "motor": {
+    "nombre": "4MSFTS-CONCEDE",
+    "version": "3.0.0-FINAL"
+  },
+  "run": {
+    "no_silent_fallbacks": true,
+    "default_mode": "V3",
+    "dataset_required": true,
+    "geography_control": "multi_select_32_entities"
+  },
+  "eligibility": {
+    "enabled": true,
+    "employee_minimum": 11,
+    "employee_maximum": null,
+    "mode": "configurable_per_run"
+  },
+  "sector": {
+    "affinity_sectors": [
+      "Agroindustria",
+      "CPG / Consumo",
+      "Retail / Mayoristas",
+      "Logística"
+    ],
+    "match_score": 100,
+    "no_match_score": 30,
+    "direct_excluders": [
+      "DISTRIBUCION DE ENERGIA",
+      "DISTRIBUCION DE AGUA",
+      "CONSTRUCCION DE OBRAS",
+      "TRATAMIENTO DE AGUAS",
+      "SUBESTACION",
+      "SISTEMAS DE RIEGO",
+      "PERFORACIONES",
+      "OBRAS PARA EL TRATAMIENTO",
+      "RESTAURANTE",
+      "PREPARACION DE ALIMENTOS PARA CONSUMO",
+      "SERVICIOS DE PREPARACION DE ALIMENTOS",
+      "CAFETERIA",
+      "COMEDOR"
+    ],
+    "taxonomy": {
+      "Agroindustria": [
+        "AZUCAR",
+        "INGENIO",
+        "GRANO",
+        "FERTILIZANTE",
+        "AGROINDUSTR",
+        "SEMILLA",
+        "AGRICOLA"
+      ],
+      "CPG / Consumo": [
+        "ALIMENTO",
+        "BEBIDA",
+        "CONSUMO",
+        "PRODUCTOS DE ASEO",
+        "HIGIENE",
+        "PAPEL",
+        "COSMETIC"
+      ],
+      "Retail / Mayoristas": [
+        "COMERCIO AL POR MAYOR",
+        "MAYORISTA",
+        "DISTRIBUCION DE ALIMENTOS",
+        "DISTRIBUCION COMERCIAL",
+        "DISTRIBUCION DE MERCANCIAS",
+        "DISTRIBUCION DE PRODUCTOS",
+        "CENTRAL DE ABASTO"
+      ],
+      "Logística": [
+        "AUTOTRANSPORTE",
+        "TRANSPORTE DE CARGA",
+        "ALMACENAMIENTO",
+        "ALMACEN GENERAL",
+        "LOGISTIC",
+        "AGENCIA ADUANAL",
+        "TRANSPORTE FERROVIARIO",
+        "FLETE",
+        "FORWARDER"
+      ],
+      "Fertilizantes": [
+        "FERTILIZANTE"
+      ],
+      "Servicios profesionales": [
+        "SERVICIOS PROFESIONALES",
+        "CONSULTORIA",
+        "DESPACHO",
+        "ASESORIA"
+      ],
+      "Comercio minorista local": [
+        "COMERCIO AL POR MENOR",
+        "TIENDA DE ABARROTES",
+        "MINISUPER"
+      ]
+    }
+  },
+  "size": {
+    "status": "CLOSED_CONTRACT_REFERENCE",
+    "scores": {
+      "0-5": 0,
+      "6-10": 40,
+      "11-30": 65,
+      "31-50": 85,
+      "51-100": 100,
+      "101-250": 90,
+      "251+": 75
+    },
+    "note": "Tabla cerrada conforme al contrato matemático V3 §5; reemplaza la tabla provisional previa."
+  },
+  "geography": {
+    "mode": "coverage_plus_score",
+    "selected_score": 100,
+    "not_selected_score": 0,
+    "unknown_score": 0,
+    "all_entities_neutral": true,
+    "entities": [
+      "AGUASCALIENTES",
+      "BAJA CALIFORNIA",
+      "BAJA CALIFORNIA SUR",
+      "CAMPECHE",
+      "CHIAPAS",
+      "CHIHUAHUA",
+      "CIUDAD DE MÉXICO",
+      "COAHUILA",
+      "COLIMA",
+      "DURANGO",
+      "ESTADO DE MÉXICO",
+      "GUANAJUATO",
+      "GUERRERO",
+      "HIDALGO",
+      "JALISCO",
+      "MICHOACÁN",
+      "MORELOS",
+      "NAYARIT",
+      "NUEVO LEÓN",
+      "OAXACA",
+      "PUEBLA",
+      "QUERÉTARO",
+      "QUINTANA ROO",
+      "SAN LUIS POTOSÍ",
+      "SINALOA",
+      "SONORA",
+      "TABASCO",
+      "TAMAULIPAS",
+      "TLAXCALA",
+      "VERACRUZ",
+      "YUCATÁN",
+      "ZACATECAS"
+    ],
+    "entity_aliases": {
+      "Veracruz de Ignacio de la Llave": "VERACRUZ"
+    }
+  },
+  "need": {
+    "status": "EVIDENCE_ONLY",
+    "unknown_score": 0,
+    "weights": {
+      "almacenamiento": 25,
+      "flota": 25,
+      "tecnologia": 25,
+      "urgencia": 25
+    },
+    "scale": [
+      0,
+      25,
+      50,
+      75,
+      100
+    ]
+  },
+  "capacity_own": {
+    "policy": "inform_only",
+    "states": [
+      "CAP-00 DESCONOCIDA"
+    ]
+  },
+  "score": {
+    "weights": {
+      "sector": 35,
+      "size": 25,
+      "geography": 10,
+      "need": 30
+    }
+  },
+  "priority": {
+    "bands": [
+      {
+        "code": "AAA",
+        "min": 80,
+        "max": 100
+      },
+      {
+        "code": "AA",
+        "min": 60,
+        "max": 79.99
+      },
+      {
+        "code": "VALIDAR",
+        "min": 0,
+        "max": 59.99
+      }
+    ]
+  },
+  "pipeline": {
+    "separate_from_score": true,
+    "ticket_required_for_pipeline": true,
+    "ticket_promedio_mxn": 69600
+  },
+  "crm": {
+    "states": [
+      "PROSPECTO",
+      "CONTACTO",
+      "INTERÉS",
+      "CITA/OPORTUNIDAD",
+      "PROPUESTA",
+      "GANADA/PERDIDA"
+    ]
+  }
+}
