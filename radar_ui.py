@@ -48,7 +48,7 @@ def _company_columns(df):
     return {k: next((norm[a.lower()] for a in opts if a.lower() in norm), None) for k,opts in aliases.items()}
 
 def render_radar_ui(result_df, metrics, config, source_name=None, selected_entities=None):
-    st.markdown("## ðŸ›°ï¸ CONCEDE AAA RADAR")
+    st.markdown("## Ã°Å¸â€ºÂ°Ã¯Â¸Â CONCEDE AAA RADAR")
     st.caption("DetecciÃ³n de seÃ±ales pÃºblicas y expediente de evidencia. Radar no modifica el Score ni el pipeline de V3.")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect(DB_PATH) as con:
@@ -56,7 +56,7 @@ def render_radar_ui(result_df, metrics, config, source_name=None, selected_entit
         signal_count = con.execute("SELECT COUNT(*) FROM signals").fetchone()[0]
         pending_count = con.execute("SELECT COUNT(*) FROM signals WHERE human_review_status='PENDIENTE'").fetchone()[0]
     m1,m2,m3 = st.columns(3); m1.metric("Expedientes", company_count); m2.metric("SeÃ±ales", signal_count); m3.metric("Pendientes de revisiÃ³n", pending_count)
-    tab_radar, tab_batch, tab_dossier, tab_review = st.tabs(["ðŸ”Ž Radar / nuevas seÃ±ales", "âš¡ InvestigaciÃ³n por lote", "ðŸ“ Expediente digital", "ðŸ§¾ ValidaciÃ³n humana"])
+    tab_radar, tab_batch, tab_dossier, tab_review = st.tabs(["Ã°Å¸â€Å½ Radar / nuevas seÃƒÂ±ales", "Ã¢Å¡Â¡ InvestigaciÃƒÂ³n por lote", "Ã°Å¸â€œÂ Expediente digital", "Ã°Å¸Â§Â¾ ValidaciÃƒÂ³n humana"])
 
     with tab_radar:
         st.markdown("### 1. Detectar una seÃ±al en una fuente oficial")
