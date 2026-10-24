@@ -10,6 +10,17 @@ from radar_logic import fetch_official_page, hypothesis_from_text
 from radar_batch import run_batch, RadarProviderError, RULE_VERSION as BATCH_RULE_VERSION
 import os
 
+# Streamlit secrets are not automatically exported as environment variables.
+# Load the private Neon URL into this process without printing it.
+if not os.getenv("DATABASE_URL"):
+    try:
+        _database_url = st.secrets.get("DATABASE_URL", "")
+        if _database_url:
+            os.environ["DATABASE_URL"] = str(_database_url)
+    except Exception:
+        pass
+
+
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "data" / "concede_radar.sqlite3"
 RULE_VERSION = "RADAR-0.1.0"
