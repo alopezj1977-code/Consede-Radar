@@ -72,11 +72,25 @@ class _HybridRow(dict):
         return super().__getitem__(key)
 
 
-def _hybrid_row(cursor):
-    names = [column.name for column in cursor.description]
-    def make_row(values):
-        return _HybridRow(zip(names, values))
-    return make_row
+class _PostgresCursor:
+    """Expose mapping rows while retaining SQLite-style row[0] access."""
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    @property
+    def rowcount(self):
+        return self._cursor.rowcount
+
+    def _convert(self, row):
+        return _HybridRow(row) if row is not None and not isinstance(row, dict) else (
+            _HybridRow(row.items()) if isinstance(row, dict) else None
+        )
+
+    def fetchone(self):
+        return self._convert(self._cursor.fetchone())
+
+    def fetchall(self):
+        return [self._convert(row) for row in self._cursor.fetchall()]
 
 
 class _PostgresConnection:
@@ -89,7 +103,7 @@ class _PostgresConnection:
         sql = re.sub(r"\?", "%s", sql)
         cur = self._connection.cursor()
         cur.execute(sql, params or ())
-        return cur
+        return _PostgresCursor(cur)
 
     def executescript(self, script):
         for statement in script.split(";"):
@@ -117,6 +131,7 @@ def connect(db_path=None):
         if database_url:
             try:
                 import psycopg
+                from psycopg.rows import dict_row
             except ImportError as exc:
                 raise RuntimeError(
                     "DATABASE_URL está configurada, pero falta psycopg[binary] en requirements.txt."
@@ -124,7 +139,7 @@ def connect(db_path=None):
             con = _PostgresConnection(
                 psycopg.connect(
                     database_url,
-                    row_factory=_hybrid_row,
+                    row_factory=dict_row,
                     connect_timeout=10,
                     sslmode="require",
                 )
