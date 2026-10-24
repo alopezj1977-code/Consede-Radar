@@ -64,6 +64,21 @@ def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
+class _HybridRow(dict):
+    """Mapping row that also supports SQLite-style numeric indexing."""
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return list(self.values())[key]
+        return super().__getitem__(key)
+
+
+def _hybrid_row(cursor):
+    names = [column.name for column in cursor.description]
+    def make_row(values):
+        return _HybridRow(zip(names, values))
+    return make_row
+
+
 class _PostgresConnection:
     """Small compatibility adapter for the SQLite-style queries used by Radar."""
     def __init__(self, connection):
@@ -101,16 +116,15 @@ def connect(db_path=None):
     try:
         if database_url:
             try:
-                import psycopg2
-                from psycopg2.extras import DictCursor
+                import psycopg
             except ImportError as exc:
                 raise RuntimeError(
-                    "DATABASE_URL está configurada, pero falta psycopg2-binary en requirements.txt."
+                    "DATABASE_URL está configurada, pero falta psycopg[binary] en requirements.txt."
                 ) from exc
             con = _PostgresConnection(
-                psycopg2.connect(
+                psycopg.connect(
                     database_url,
-                    cursor_factory=DictCursor,
+                    row_factory=_hybrid_row,
                     connect_timeout=10,
                     sslmode="require",
                 )
