@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from radar_store import create_company, add_signal, review_signal, get_company_dossier, connect
+from radar_store import create_company, add_signal, review_signal, get_company_dossier, connect, link_company_denue
 from radar_logic import fetch_official_page, hypothesis_from_text
 from radar_batch import run_batch, RadarProviderError, RULE_VERSION as BATCH_RULE_VERSION
 import os
@@ -216,7 +216,18 @@ def render_radar_ui(result_df, metrics, config, source_name=None, selected_entit
             dossier = get_company_dossier(DB_PATH, cid)
             co = dossier["company"]
             c1,c2,c3 = st.columns(3); c1.metric("Señales", dossier["signal_count"]); c2.metric("Impacto Score", f"{dossier['score_impact_total']:.1f}"); c3.metric("ID DENUE", co.get("denue_id") or "No vinculado")
-            st.write({"Empresa":co["display_name"], "Entidad":co["state_code"], "Municipio":co["municipality"], "Creado":co["created_at"]})
+            st.write({"Empresa":co["display_name"], "Entidad":co["state_code"], "Municipio":co["municipality"], "CLEE":co.get("denue_clee") or "No vinculada", "Creado":co["created_at"]})
+            with st.expander("🔗 Vincular / actualizar identidad oficial DENUE"):
+                st.caption("Solo actualiza identificadores y ubicación del expediente seleccionado. No crea empresas, no cambia señales ni modifica Score o pipeline V3.")
+                denue_id_input = st.text_input("ID oficial DENUE", value=str(co.get("denue_id") or ""), key=f"denue_id_{cid}")
+                denue_clee_input = st.text_input("CLEE oficial", value=str(co.get("denue_clee") or ""), key=f"denue_clee_{cid}")
+                if st.button("Validar y vincular DENUE", key=f"link_denue_{cid}"):
+                    try:
+                        link_company_denue(DB_PATH, cid, denue_id_input, denue_clee_input, state_code="19", municipality="Apodaca")
+                        st.success("Identidad DENUE vinculada al expediente existente. No se modificaron señales ni variables de V3.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"No se vinculó el registro: {exc}")
             if dossier["signals"]:
                 sig_df = pd.DataFrame(dossier["signals"])
                 st.dataframe(sig_df[[c for c in ["signal_id","title","signal_type","source_url","captured_at","human_review_status","need_hypothesis","next_best_question","score_impact"] if c in sig_df]], use_container_width=True, hide_index=True)
