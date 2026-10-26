@@ -18,6 +18,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS companies (
   company_id TEXT PRIMARY KEY,
   denue_id TEXT,
+  denue_clee TEXT,
   display_name TEXT NOT NULL,
   state_code TEXT,
   municipality TEXT,
@@ -122,6 +123,17 @@ class _PostgresConnection:
         self._connection.close()
 
 
+
+def _ensure_denue_clee(con, postgres=False):
+    """Add DENUE CLEE column to existing databases without replacing records."""
+    if postgres:
+        columns = {r[0] for r in con.execute("SELECT column_name FROM information_schema.columns WHERE table_name='companies'").fetchall()}
+    else:
+        columns = {r[1] for r in con.execute("PRAGMA table_info(companies)").fetchall()}
+    if "denue_clee" not in columns:
+        con.execute("ALTER TABLE companies ADD COLUMN denue_clee TEXT")
+
+
 @contextmanager
 def connect(db_path=None):
     """Open Neon PostgreSQL if DATABASE_URL is set; otherwise use SQLite locally."""
@@ -145,6 +157,7 @@ def connect(db_path=None):
                 )
             )
             con.executescript(SCHEMA)
+            _ensure_denue_clee(con, postgres=True)
         else:
             path = Path(db_path or "data/concede_radar.sqlite3")
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,6 +165,7 @@ def connect(db_path=None):
             con.row_factory = sqlite3.Row
             con.execute("PRAGMA foreign_keys = ON")
             con.executescript(SCHEMA)
+            _ensure_denue_clee(con, postgres=False)
         yield con
         con.commit()
     except Exception:
@@ -171,6 +185,27 @@ def create_company(db_path, display_name, denue_id=None, state_code=None, munici
         con.execute("""INSERT INTO companies(company_id,denue_id,display_name,state_code,municipality,created_at)
         VALUES(?,?,?,?,?,?)""", (cid, denue_id, display_name.strip(), state_code, municipality, now_iso()))
     return cid
+
+
+
+def link_company_denue(db_path, company_id, denue_id, denue_clee, state_code="19", municipality="Apodaca"):
+    """Link a verified DENUE identity to an existing Radar dossier, without touching signals or V3."""
+    denue_id = str(denue_id or "").strip()
+    denue_clee = str(denue_clee or "").strip()
+    if not denue_id or not denue_clee:
+        raise ValueError("El ID DENUE y la CLEE son obligatorios.")
+    with connect(db_path) as con:
+        if not con.execute("SELECT 1 FROM companies WHERE company_id=?", (company_id,)).fetchone():
+            raise ValueError("El expediente seleccionado no existe.")
+        collision = con.execute("SELECT display_name FROM companies WHERE denue_id=? AND company_id<>?", (denue_id, company_id)).fetchone()
+        if collision:
+            raise ValueError(f"El ID DENUE ya está vinculado a otro expediente: {collision['display_name']}. No se modificó nada.")
+        collision = con.execute("SELECT display_name FROM companies WHERE denue_clee=? AND company_id<>?", (denue_clee, company_id)).fetchone()
+        if collision:
+            raise ValueError(f"La CLEE ya está vinculada a otro expediente: {collision['display_name']}. No se modificó nada.")
+        con.execute("UPDATE companies SET denue_id=?, denue_clee=?, state_code=?, municipality=? WHERE company_id=?",
+                    (denue_id, denue_clee, state_code, municipality, company_id))
+    return True
 
 
 def add_signal(db_path, *, company_id=None, source_id, source_url, signal_type, title,
