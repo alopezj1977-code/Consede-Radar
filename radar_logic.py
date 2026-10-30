@@ -152,6 +152,15 @@ def commercial_relevance(title: str, snippet: str = "", url: str = "") -> tuple[
         r"\b(?:flota|transporte|cadena\s+de\s+suministro|operaciones\s+logisticas)\b",
         r"\b(?:parque|proyecto)\s+industrial\b",
         r"\b(?:compra|adquisicion)\s+de\s+(?:terrenos|inmuebles)\b",
+        # Señales operativas agroindustriales; son indicios, no necesidades confirmadas.
+        r"\b(?:agroindustria|agroindustrial|agroindustriales)\b",
+        r"\b(?:empacadora|empacadoras|packing\s+house|packhouse)\b",
+        r"\b(?:empaque|empaques|seleccion\s+y\s+empaque|envasado|embalaje)\b",
+        r"\b(?:exportacion|exportaciones|exportar|comercializacion\s+de\s+productos\s+agricolas)\b",
+        r"\b(?:procesamiento|procesadora|procesadoras|beneficio\s+de\s+productos\s+agricolas)\b",
+        r"\b(?:enceradora|encerado|frigorifico|cadena\s+de\s+frio|cuarto\s+frio)\b",
+        r"\b(?:citricos|limon|naranja|toronja|frutas?)\b.{0,60}\b(?:empaque|exportacion|procesamiento|produccion)\b",
+        r"\b(?:certificacion|certificaciones|inocuidad|trazabilidad)\b.{0,60}\b(?:agricola|alimentaria|exportacion|planta)\b",
     )
 
     if any(re.search(p, text, flags=re.IGNORECASE) for p in business_patterns):
