@@ -211,7 +211,14 @@ def link_company_denue(db_path, company_id, denue_id, denue_clee, state_code="19
 def add_signal(db_path, *, company_id=None, source_id, source_url, signal_type, title,
                snippet="", published_at=None, source_status="INSPECCIONADA",
                identity_status="PENDIENTE", need_hypothesis="", next_best_question="",
-               competition_status="INDETERMINADO", run_id, rule_version, payload=None):
+               competition_status="INDETERMINADO", run_id, rule_version, payload=None,
+               return_created=False):
+    """Insert a signal once per company/source/URL; repeated batch runs are safe.
+
+    By default returns the signal ID (backward compatible). When return_created=True,
+    returns (signal_id, created) so callers can report new inserts separately from
+    duplicates without changing existing review history or evidence.
+    """
     if signal_type not in SIGNAL_TYPES:
         raise ValueError("signal_type no reconocido")
     if competition_status not in COMPETITION:
@@ -224,6 +231,16 @@ def add_signal(db_path, *, company_id=None, source_id, source_url, signal_type, 
     with connect(db_path) as con:
         if company_id and not con.execute("SELECT 1 FROM companies WHERE company_id=?", (company_id,)).fetchone():
             raise ValueError("company_id no existe; crear empresa o dejar identidad sin resolver")
+        existing = con.execute(
+            """SELECT signal_id FROM signals
+               WHERE source_id=? AND source_url=?
+                 AND COALESCE(company_id, '')=COALESCE(?, '')
+               ORDER BY captured_at ASC LIMIT 1""",
+            (source_id, source_url, company_id),
+        ).fetchone()
+        if existing:
+            existing_id = existing["signal_id"]
+            return (existing_id, False) if return_created else existing_id
         con.execute("""INSERT INTO signals(
         signal_id,company_id,source_id,source_url,signal_type,title,snippet,published_at,captured_at,
         source_status,identity_status,need_hypothesis,next_best_question,competition_status,
@@ -232,7 +249,7 @@ def add_signal(db_path, *, company_id=None, source_id, source_url, signal_type, 
         (sid, company_id, source_id, source_url, signal_type, title, snippet, published_at, now_iso(),
          source_status, identity_status, need_hypothesis, next_best_question, competition_status,
          "PENDIENTE", run_id, rule_version, 0.0, json.dumps(payload or {}, ensure_ascii=False)))
-    return sid
+    return (sid, True) if return_created else sid
 
 
 def review_signal(db_path, signal_id, status, reviewer, reason):

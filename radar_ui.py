@@ -184,7 +184,7 @@ def render_radar_ui(result_df, metrics, config, source_name=None, selected_entit
                                 legal_name = str(row.get(batch_cols["razon"], "")).strip() if batch_cols.get("razon") else ""
                                 companies.append({"display_name":trade_name or legal_name or "Establecimiento sin nombre", "legal_name":legal_name, "denue_id":str(row.get(batch_cols["id"], "")) if batch_cols.get("id") else "", "state":str(row.get(batch_cols["state"], "")) if batch_cols.get("state") else "", "municipality":str(row.get(batch_cols["municipality"], "")) if batch_cols.get("municipality") else "", "activity":str(row.get(batch_cols["activity"], "")) if batch_cols.get("activity") else ""})
                             results = run_batch(companies, search_fn=lambda c: __import__("radar_batch").search_company_tavily(c, api_key=key), max_batch=20)
-                            stored=0; summary=[]
+                            stored=0; duplicates=0; summary=[]
                             for item in results:
                                 co=item["company"]
                                 diag = item.get("diagnostics") or {}
@@ -197,14 +197,17 @@ def render_radar_ui(result_df, metrics, config, source_name=None, selected_entit
                                     existing=con.execute("SELECT company_id FROM companies WHERE denue_id=?",(denue_id,)).fetchone() if denue_id else None
                                 cid=existing[0] if existing else create_company(DB_PATH,co["display_name"],denue_id=denue_id,state_code=co.get("state") or None,municipality=co.get("municipality") or None)
                                 for hit in item["results"]:
-                                    add_signal(DB_PATH,company_id=cid,source_id=hit["source_id"],source_url=hit["source_url"],signal_type="NOTICIA-CORPORATIVA",title=hit["title"],snippet=hit["snippet"],published_at=hit.get("published_at"),source_status="LOCALIZADA",identity_status=hit["identity_status"],need_hypothesis=hit["need_hypothesis"],next_best_question=hit["next_best_question"],competition_status="INDETERMINADO",run_id=str(metrics.get("run_id","RUN-BATCH")),rule_version=BATCH_RULE_VERSION,payload={"search_query":hit["query"],"heuristic_not_llm":True,"score_impact":0.0,"company_identity_requires_review":True})
-                                    stored+=1
+                                    _, created = add_signal(DB_PATH,company_id=cid,source_id=hit["source_id"],source_url=hit["source_url"],signal_type="NOTICIA-CORPORATIVA",title=hit["title"],snippet=hit["snippet"],published_at=hit.get("published_at"),source_status="LOCALIZADA",identity_status=hit["identity_status"],need_hypothesis=hit["need_hypothesis"],next_best_question=hit["next_best_question"],competition_status="INDETERMINADO",run_id=str(metrics.get("run_id","RUN-BATCH")),rule_version=BATCH_RULE_VERSION,payload={"search_query":hit["query"],"heuristic_not_llm":True,"score_impact":0.0,"company_identity_requires_review":True},return_created=True)
+                                    if created:
+                                        stored+=1
+                                    else:
+                                        duplicates+=1
                             st.session_state["radar_batch_summary"] = summary
                             total_raw = sum(int(x.get("raw_count",0)) for x in results)
                             total_accepted = sum(int(x.get("result_count",0)) for x in results)
                             total_discarded = sum(int(x.get("discarded_count",0)) for x in results)
                             total_errors = sum(1 for x in results if x["status"] == "ERROR")
-                            st.success(f"Lote terminado. Proveedor: {total_raw} resultados; aceptadas: {total_accepted}; descartadas: {total_discarded}; errores: {total_errors}. Señales registradas para revisión: {stored}. Score V3 no fue modificado.")
+                            st.success(f"Lote terminado. Proveedor: {total_raw} resultados; aceptadas: {total_accepted}; descartadas: {total_discarded}; errores: {total_errors}. Señales nuevas registradas: {stored}; duplicadas omitidas: {duplicates}. Score V3 no fue modificado.")
                             if total_raw == 0 and total_errors == 0:
                                 st.warning("Tavily no devolvió resultados para las empresas consultadas. Esto no se interpreta como ausencia de actividad comercial.")
                             elif total_raw > 0 and total_accepted == 0:
