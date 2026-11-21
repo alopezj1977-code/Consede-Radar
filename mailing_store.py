@@ -233,3 +233,25 @@ def mark_accepted(workspace_id, campaign_id, db_path=None):
             raise ValueError(
                 "El borrador no existe en este workspace o ya fue procesado."
             )
+
+def validate_campaign_recipients(workspace_id, recipients, db_path=None):
+    """Return recipients still authorized and eligible at the exact time of sending."""
+    requested = list(dict.fromkeys(
+        str(email).strip().lower() for email in recipients if str(email).strip()
+    ))
+    if not requested:
+        return [], []
+    placeholders = ",".join("?" for _ in requested)
+    statement = (
+        "SELECT email FROM mailing_contacts "
+        "WHERE workspace_id=? AND campaign_eligible=1 "
+        f"AND email IN ({placeholders})"
+    )
+    with _connect(db_path) as (con, postgres):
+        rows = con.execute(
+            _sql(statement, postgres), (str(workspace_id), *requested)
+        ).fetchall()
+    eligible = {row["email"] for row in rows}
+    allowed = [email for email in requested if email in eligible]
+    blocked = [email for email in requested if email not in eligible]
+    return allowed, blocked
