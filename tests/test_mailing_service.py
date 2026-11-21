@@ -102,7 +102,7 @@ if __name__ == "__main__":
     unittest.main()
 
 from mailing_service import protect_mail_auth_flow, restore_mail_auth_flow
-from mailing_store import get_latest_draft, list_contacts, mark_accepted, save_draft, upsert_contacts
+from mailing_store import ensure_schema, get_latest_draft, list_contacts, mark_accepted, save_draft, upsert_contacts
 
 
 def test_oauth_state_round_trip_is_encrypted_and_restorable():
@@ -125,6 +125,7 @@ def test_oauth_state_round_trip_is_encrypted_and_restorable():
 def test_mailing_store_is_workspace_scoped_and_draft_lifecycle(tmp_path, monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     db = tmp_path / "mailing.sqlite3"
+    ensure_schema(db_path=db)
     contacts = [{
         "empresa": "Empresa A",
         "correo": "persona@example.com",
