@@ -100,3 +100,52 @@ class MailingServiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+from mailing_service import protect_mail_auth_flow, restore_mail_auth_flow
+from mailing_store import get_latest_draft, list_contacts, mark_accepted, save_draft, upsert_contacts
+
+
+def test_oauth_state_round_trip_is_encrypted_and_restorable():
+    config = {"client_secret": "test-secret"}
+    flow = {
+        "auth_uri": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=x&state=original",
+        "state": "original",
+        "redirect_uri": "https://example.streamlit.app/",
+        "token_endpoint": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "code_verifier": "verifier",
+    }
+    auth_url, protected_state = protect_mail_auth_flow(config, flow)
+    assert "original" not in protected_state
+    restored = restore_mail_auth_flow(config, protected_state)
+    assert restored["state"] == protected_state
+    assert restored["code_verifier"] == "verifier"
+    assert f"state={protected_state}" in auth_url
+
+
+def test_mailing_store_is_workspace_scoped_and_draft_lifecycle(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    db = tmp_path / "mailing.sqlite3"
+    contacts = [{
+        "empresa": "Empresa A",
+        "correo": "persona@example.com",
+        "contacto": "Persona",
+        "fuente": "https://example.com",
+        "autorizado": True,
+        "correo_valido": True,
+        "apto": True,
+    }]
+    assert upsert_contacts("workspace-a", contacts, db_path=db) == 1
+    assert len(list_contacts("workspace-a", db_path=db)) == 1
+    assert list_contacts("workspace-b", db_path=db) == []
+
+    draft = {
+        "id": "campaign-1",
+        "name": "Prueba",
+        "subject": "Asunto",
+        "body": "Mensaje",
+        "recipients": ["persona@example.com"],
+    }
+    save_draft("workspace-a", draft, db_path=db)
+    assert get_latest_draft("workspace-a", db_path=db)["id"] == "campaign-1"
+    mark_accepted("workspace-a", "campaign-1", db_path=db)
+    assert get_latest_draft("workspace-a", db_path=db) is None
