@@ -104,7 +104,7 @@ if __name__ == "__main__":
 from urllib.parse import parse_qs, urlsplit
 
 from mailing_service import protect_mail_auth_flow, restore_mail_auth_flow
-from mailing_store import ensure_schema, get_latest_draft, list_contacts, mark_accepted, save_draft, upsert_contacts
+from mailing_store import ensure_schema, get_latest_draft, list_contacts, mark_accepted, save_draft, upsert_contacts, validate_campaign_recipients
 
 
 def test_oauth_state_round_trip_is_encrypted_and_restorable():
@@ -152,3 +152,33 @@ def test_mailing_store_is_workspace_scoped_and_draft_lifecycle(tmp_path, monkeyp
     assert get_latest_draft("workspace-a", db_path=db)["id"] == "campaign-1"
     mark_accepted("workspace-a", "campaign-1", db_path=db)
     assert get_latest_draft("workspace-a", db_path=db) is None
+
+
+def test_campaign_rechecks_current_consent_before_send(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    db = tmp_path / "consent.sqlite3"
+    ensure_schema(db_path=db)
+    contact = {
+        "empresa": "Empresa",
+        "correo": "persona@example.com",
+        "contacto": "Persona",
+        "fuente": "Referencia",
+        "autorizado": True,
+        "correo_valido": True,
+        "apto": True,
+    }
+    upsert_contacts("workspace-a", [contact], db_path=db)
+    allowed, blocked = validate_campaign_recipients(
+        "workspace-a", ["persona@example.com"], db_path=db
+    )
+    assert allowed == ["persona@example.com"]
+    assert blocked == []
+
+    contact["autorizado"] = False
+    contact["apto"] = False
+    upsert_contacts("workspace-a", [contact], db_path=db)
+    allowed, blocked = validate_campaign_recipients(
+        "workspace-a", ["persona@example.com"], db_path=db
+    )
+    assert allowed == []
+    assert blocked == ["persona@example.com"]
