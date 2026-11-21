@@ -186,7 +186,7 @@ def render_mailing_ui(result_df=None, metrics=None, config=None):
                     f"Contactos guardados: {len(parsed):,} · "
                     f"aptos para campaña: {int(parsed['apto'].sum()):,}"
                 )
-            except (ValueError, RuntimeError, OSError) as exc:
+            except Exception as exc:
                 st.error(f"No se guardaron los contactos: {exc}")
 
         contacts = st.session_state["concede_mail_contacts"]
