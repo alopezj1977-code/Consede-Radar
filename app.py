@@ -15,6 +15,7 @@ import streamlit as st
 
 from core import load_config, run, ConfigError, identify_columns
 from radar_ui import render_radar_ui
+from mailing_ui import render_mailing_ui
 
 
 # ============================================================
@@ -497,9 +498,11 @@ if result is None or metrics is None:
 
     # Radar accesible incluso antes de cargar/ejecutar una base V3.
     st.markdown("### Inteligencia de señales y expediente")
-    radar_tab_sin_corrida = st.tabs(["🛰️ Radar / Expediente"])[0]
+    radar_tab_sin_corrida, mailing_tab_sin_corrida = st.tabs(["🛰️ Radar / Expediente", "📨 Mailing"])
     with radar_tab_sin_corrida:
         render_radar_ui(None, {"run_id": "RUN-SIN-CORRIDA"}, CFG, None, effective_entities)
+    with mailing_tab_sin_corrida:
+        render_mailing_ui(None, {"run_id": "RUN-SIN-CORRIDA"}, CFG)
 
     st.stop()
 
@@ -546,13 +549,14 @@ st.caption(
 # TABS EJECUTIVOS
 # ============================================================
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     [
         "📋 Matriz de Priorización",
         "📊 Gráficos & Dispersión",
         "🧭 Diagnóstico de Madurez",
         "⚙️ Configuración & Diagnóstico",
         "🛰️ Radar / Expediente",
+        "📨 Mailing",
     ]
 )
 
@@ -854,6 +858,9 @@ with tab4:
 
 with tab5:
     render_radar_ui(result, metrics, CFG, st.session_state.get("concede_source_name"), effective_entities)
+
+with tab6:
+    render_mailing_ui(result, metrics, CFG)
 
 
 # ============================================================

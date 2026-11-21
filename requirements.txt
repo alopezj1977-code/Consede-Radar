@@ -2,3 +2,6 @@ streamlit
 pandas
 plotly
 psycopg[binary]
+requests>=2.31,<3
+msal>=1.30,<2
+cryptography>=42,<47
