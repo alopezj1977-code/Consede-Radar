@@ -16,16 +16,21 @@ Conceder consentimiento conforme a las políticas del tenant. No usar permisos d
 En Manage app → Settings → Secrets, configurar los valores sin publicarlos en GitHub:
 
 ```toml
+DATABASE_URL = "postgresql://...neon.tech/...?...sslmode=require"
+
 [mailing]
 tenant_id = "TENANT_ID"
 client_id = "APPLICATION_CLIENT_ID"
 client_secret = "CLIENT_SECRET"
 sender_mailbox = "C@4msfts.com"
-# Opcional: si se omite, la app deriva la URL activa de Streamlit.
+workspace_id = "4msfts"
+# Opcional; si se omite, la app deriva la URL activa de Streamlit.
 redirect_uri = "https://URL-PUBLICA-REAL-DE-CONCEDE/"
 ```
 
-Nunca enviar estos valores por chat ni incorporarlos al repositorio. Si se configura `redirect_uri`, registrar exactamente la misma URL en Microsoft Entra. Si se omite, CONCEDE deriva la URL pública activa; esa URL también debe estar registrada en Entra.
+Nunca enviar estos valores por chat ni incorporarlos al repositorio. Si se configura `redirect_uri`, registrar exactamente la misma URL en Entra. Si se omite, CONCEDE deriva la URL pública activa; esa URL también debe estar registrada en Entra.
+
+La conexión Neon usa la misma variable `DATABASE_URL` que Radar, pero Mailing escribe exclusivamente en sus tablas propias: `mailing_contacts` y `mailing_campaigns`. No modifica las tablas de señales ni el motor de scoring. Si `DATABASE_URL` no está configurada, la aplicación puede operar en SQLite local, pero esa modalidad no garantiza persistencia compartida en Streamlit Cloud.
 
 ## Operación
 1. Importar CSV con empresa, correo, contacto, fuente y autorizado.
@@ -35,10 +40,7 @@ Nunca enviar estos valores por chat ni incorporarlos al repositorio. Si se confi
 5. Revisar contenido y lista completa de destinatarios.
 6. Marcar aprobación expresa y pulsar Enviar campaña aprobada.
 
-Los destinatarios se colocan en BCC. El servicio vuelve a consultar la identidad del buzón inmediatamente antes de enviar y rechaza cualquier cuenta distinta de `C@4msfts.com`. El límite operativo por campaña es de 500 destinatarios. HTTP 202 significa que Graph aceptó la solicitud; no garantiza entrega final.
-
-## Estado de persistencia
-En esta versión, contactos, borradores y caché de autenticación viven en la sesión de Streamlit; no se consideran persistencia compartida. La integración de persistencia multiusuario requiere una decisión y validación de workspace/retención antes de almacenar datos personales y tokens en una base compartida.
+Contactos y borradores se guardan por `workspace_id`. Los correos se envían en BCC. El servicio vuelve a consultar la identidad del buzón inmediatamente antes de enviar y rechaza cualquier cuenta distinta de `C@4msfts.com`. El límite operativo por campaña es de 500 destinatarios. HTTP 202 significa que Graph aceptó la solicitud; no garantiza entrega final.
 
 ## Seguridad y límites
-No hay lectura de bandeja, envíos automáticos ni envíos programados. Ningún correo se envía al importar contactos, redactar o guardar borradores. Los secretos no se guardan en el repositorio.
+No hay lectura de bandeja, envíos automáticos ni envíos programados. Ningún correo se envía al importar contactos, redactar o guardar borradores. Los secretos y tokens no se guardan en el repositorio. La caché OAuth permanece en la sesión de Streamlit; no se persisten tokens de Microsoft 365 en Neon.
