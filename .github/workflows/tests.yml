@@ -26,6 +26,6 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
       - name: Compile application modules
-        run: python -m compileall -q app.py core.py radar_ui.py radar_store.py mailing_auth.py mailing_service.py mailing_ui.py
+        run: python -m compileall -q app.py core.py radar_ui.py radar_store.py mailing_store.py mailing_auth.py mailing_service.py mailing_ui.py
       - name: Run automated tests
         run: python -m pytest -q
