@@ -28,6 +28,7 @@ def read_mail_config(secrets: Any) -> tuple[dict[str, str], list[str]]:
     keys = ("tenant_id", "client_id", "client_secret", "sender_mailbox")
     config = {key: str(raw.get(key, "")).strip() for key in keys}
     config["redirect_uri"] = str(raw.get("redirect_uri", "")).strip()
+    config["workspace_id"] = str(raw.get("workspace_id", "4msfts")).strip() or "4msfts"
     missing = [key for key, value in config.items() if key != "redirect_uri" and not value]
     if config.get("sender_mailbox", "").casefold() != APPROVED_SENDER_MAILBOX.casefold():
         if "sender_mailbox" not in missing:
