@@ -22,6 +22,7 @@ from mailing_store import (
     mark_accepted,
     save_draft,
     upsert_contacts,
+    validate_campaign_recipients,
 )
 
 _TRUE = {"SI", "SÍ", "TRUE", "1", "AUTORIZADO", "YES", "Y"}
@@ -309,6 +310,14 @@ def render_mailing_ui(result_df=None, metrics=None, config=None):
                 disabled=(not approved or not token),
             ):
                 try:
+                    allowed, blocked = validate_campaign_recipients(
+                        workspace_id, draft["recipients"]
+                    )
+                    if blocked or len(allowed) != len(draft["recipients"]):
+                        raise MailDeliveryError(
+                            "Envío bloqueado: hay destinatarios sin autorización vigente "
+                            "o que ya no pertenecen a la base apta. Revisa la campaña antes de continuar."
+                        )
                     outcome = send_graph_mail(
                         mail_config,
                         draft["recipients"],
