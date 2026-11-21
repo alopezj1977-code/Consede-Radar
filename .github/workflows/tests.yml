@@ -28,4 +28,4 @@ jobs:
       - name: Compile application modules
         run: python -m compileall -q app.py core.py radar_ui.py radar_store.py mailing_auth.py mailing_service.py mailing_ui.py
       - name: Run automated tests
-        run: pytest -q
+        run: python -m pytest -q
