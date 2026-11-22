@@ -18,7 +18,7 @@ class SearchResults(list):
         self.diagnostics = diagnostics or {}
 def _company_search_names(company: dict) -> list[str]:
     names, seen = [], set()
-    for value in (company.get("display_name"), company.get("legal_name"), company.get("razon_social")):
+    for value in (company.get("display_name"), company.get("legal_name"), company.get("razon_social"), company.get("rfc")):
         name = str(value or "").strip()
         if name and name.casefold() not in seen:
             names.append(name); seen.add(name.casefold())
