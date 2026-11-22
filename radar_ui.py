@@ -48,15 +48,75 @@ SOURCE_CATALOG = {
 }
 
 
+def _normalize_column(value):
+    import re
+    import unicodedata
+    value = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+
+
 def _company_columns(df):
     aliases = {
-        "id": ["id", "ID"], "name": ["nom_estab", "nombre establecimiento", "nombre", "empresa"],
-        "razon": ["raz_social", "razon social"], "state": ["entidad", "estado"],
-        "municipality": ["municipio"], "activity": ["nombre_act", "actividad"],
-        "employees": ["per_ocu", "personal ocupado", "empleados"],
+        "id": ["id", "denue_id", "codigo del establecimiento"],
+        "name": ["nom_estab", "nombre establecimiento", "nombre", "empresa", "proveedor o contratista", "proveedor", "razon social", "raz_social"],
+        "razon": ["raz_social", "razon social", "proveedor o contratista"],
+        "rfc": ["rfc"],
+        "state": ["entidad", "estado", "entidad federativa"],
+        "municipality": ["municipio"],
+        "activity": ["nombre_act", "actividad", "titulo del contrato", "titulo del expediente", "tipo de contratacion"],
+        "contract_id": ["codigo del contrato", "numero de procedimiento", "codigo del expediente"],
+        "contract_title": ["titulo del contrato", "titulo del expediente"],
     }
-    norm = {str(c).strip().lower(): c for c in df.columns}
-    return {k: next((norm[a.lower()] for a in opts if a.lower() in norm), None) for k,opts in aliases.items()}
+    norm = {_normalize_column(c): c for c in df.columns}
+    found = {k: next((norm[_normalize_column(a)] for a in opts if _normalize_column(a) in norm), None) for k, opts in aliases.items()}
+    found["kind"] = "comprasmx_contracts" if found.get("rfc") and found.get("name") and found.get("contract_id") else "company_directory"
+    return found
+
+
+def _read_uploaded_csv(uploaded_file):
+    """Read official Compras MX exports (Windows-1252) and standard UTF-8 CSVs."""
+    import io
+    raw = uploaded_file.getvalue()
+    last_error = None
+    for encoding in ("utf-8-sig", "cp1252", "latin1"):
+        try:
+            frame = pd.read_csv(io.BytesIO(raw), dtype=str, encoding=encoding, low_memory=False).fillna("")
+            return frame, encoding
+        except UnicodeDecodeError as exc:
+            last_error = exc
+    raise last_error or ValueError("No fue posible identificar la codificación del CSV.")
+
+
+def _batch_companies(frame, columns, limit):
+    """Build a bounded, deduplicated company batch from either supported CSV family."""
+    companies = []
+    seen = set()
+    for _, row in frame.iterrows():
+        name = str(row.get(columns.get("name"), "")).strip()
+        if not name:
+            continue
+        rfc = str(row.get(columns.get("rfc"), "")).strip().upper() if columns.get("rfc") else ""
+        dedupe_key = ("RFC:" + rfc) if rfc else ("NAME:" + name.casefold())
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        legal_name = str(row.get(columns.get("razon"), "")).strip() if columns.get("razon") else ""
+        activity = str(row.get(columns.get("activity"), "")).strip() if columns.get("activity") else ""
+        contract_title = str(row.get(columns.get("contract_title"), "")).strip() if columns.get("contract_title") else ""
+        if columns.get("kind") == "comprasmx_contracts":
+            activity = " | ".join(x for x in (contract_title, activity) if x)[:500]
+        companies.append({
+            "display_name": name, "legal_name": legal_name or name, "rfc": rfc,
+            "denue_id": str(row.get(columns.get("id"), "")).strip() if columns.get("id") else "",
+            "state": str(row.get(columns.get("state"), "")).strip() if columns.get("state") else "",
+            "municipality": str(row.get(columns.get("municipality"), "")).strip() if columns.get("municipality") else "",
+            "activity": activity,
+            "contract_reference": str(row.get(columns.get("contract_id"), "")).strip() if columns.get("contract_id") else "",
+        })
+        if len(companies) >= int(limit):
+            break
+    return companies
+
 
 def render_radar_ui(result_df, metrics, config, source_name=None, selected_entities=None):
     st.markdown("## 🛰️ CONCEDE AAA RADAR")
@@ -159,17 +219,25 @@ def render_radar_ui(result_df, metrics, config, source_name=None, selected_entit
         batch_file = st.file_uploader("Carga CSV AA o VALIDAR", type=["csv"], key="radar_batch_csv")
         if batch_file is not None:
             try:
-                batch_df = pd.read_csv(batch_file, dtype=str, encoding="utf-8-sig").fillna("")
+                batch_df, csv_encoding = _read_uploaded_csv(batch_file)
                 batch_cols = _company_columns(batch_df)
                 if not batch_cols.get("name"):
-                    st.error("No identifiqué la columna nom_estab/nombre. No se ejecutó ninguna búsqueda.")
+                    st.error("No identifiqué una columna de empresa/proveedor. Se aceptan bases AA/VALIDAR y exportaciones oficiales de Compras MX.")
+                elif batch_cols.get("kind") == "comprasmx_contracts" and not batch_cols.get("rfc"):
+                    st.error("La exportación de Compras MX debe incluir RFC y Proveedor o contratista.")
                 else:
-                    st.caption(f"Registros leídos: {len(batch_df):,}. Se permite procesar hasta 20 empresas por corrida.")
-                    n = min(20, len(batch_df))
-                    limit = st.number_input("Empresas a investigar en este lote", min_value=1, max_value=max(1,n), value=min(10,n), step=1, key="radar_batch_limit")
-                    preview = batch_df.head(int(limit))
+                    batch_kind = "Contratos / adjudicaciones de Compras MX" if batch_cols.get("kind") == "comprasmx_contracts" else "Directorio de empresas AA / VALIDAR"
+                    st.caption(f"Formato detectado: {batch_kind} · Codificación: {csv_encoding} · Registros leídos: {len(batch_df):,}.")
+                    st.caption("Se consolidan proveedores repetidos por RFC y se limita cada búsqueda a 20 empresas únicas.")
+                    unique_count = batch_df[batch_cols["name"]].astype(str).str.strip().replace("", pd.NA).dropna().nunique()
+                    n = min(20, int(unique_count))
+                    if n == 0:
+                        st.warning("El archivo se pudo leer, pero no contiene empresas/proveedores identificables.")
+                    limit = st.number_input("Empresas únicas a investigar en este lote", min_value=1, max_value=max(1,n), value=min(10,n), step=1, key="radar_batch_limit")
+                    companies = _batch_companies(batch_df, batch_cols, int(limit))
+                    preview = pd.DataFrame([{"Empresa / proveedor": c["display_name"], "RFC": c.get("rfc") or "No disponible", "Actividad / contrato": c.get("activity") or "No disponible", "Referencia": c.get("contract_reference") or "No disponible"} for c in companies])
                     st.dataframe(preview.head(5), use_container_width=True, hide_index=True)
-                    if st.button("Buscar señales del lote", key="radar_batch_run"):
+                    if st.button("Buscar señales del lote", key="radar_batch_run", disabled=not companies):
                         key = os.getenv("TAVILY_API_KEY", "")
                         try:
                             key = key or st.secrets.get("TAVILY_API_KEY", "")
@@ -178,11 +246,7 @@ def render_radar_ui(result_df, metrics, config, source_name=None, selected_entit
                         if not key:
                             st.error("No se ejecutó la búsqueda: falta configurar TAVILY_API_KEY en los secretos de la aplicación.")
                         else:
-                            companies=[]
-                            for _, row in preview.iterrows():
-                                trade_name = str(row.get(batch_cols["name"], "")).strip()
-                                legal_name = str(row.get(batch_cols["razon"], "")).strip() if batch_cols.get("razon") else ""
-                                companies.append({"display_name":trade_name or legal_name or "Establecimiento sin nombre", "legal_name":legal_name, "denue_id":str(row.get(batch_cols["id"], "")) if batch_cols.get("id") else "", "state":str(row.get(batch_cols["state"], "")) if batch_cols.get("state") else "", "municipality":str(row.get(batch_cols["municipality"], "")) if batch_cols.get("municipality") else "", "activity":str(row.get(batch_cols["activity"], "")) if batch_cols.get("activity") else ""})
+                            companies = _batch_companies(batch_df, batch_cols, int(limit))
                             results = run_batch(companies, search_fn=lambda c: __import__("radar_batch").search_company_tavily(c, api_key=key), max_batch=20)
                             stored=0; duplicates=0; summary=[]
                             for item in results:
