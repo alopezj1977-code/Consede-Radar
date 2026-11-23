@@ -1,6 +1,8 @@
 """Streamlit UI for workspace-scoped CRM and human-validated commercial evidence."""
 from __future__ import annotations
 
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -24,8 +26,14 @@ def render_crm_ui(result_df):
     )
     workspace_id = _workspace_id()
     try:
+        try:
+            database_url = st.secrets.get("DATABASE_URL", "")
+        except Exception:
+            database_url = ""
+        if database_url and not os.getenv("DATABASE_URL"):
+            os.environ["DATABASE_URL"] = str(database_url)
         ensure_schema()
-        storage = "Neon" if __import__("os").getenv("DATABASE_URL") else "SQLite local"
+        storage = "Neon" if os.getenv("DATABASE_URL") else "SQLite local"
         st.caption(f"Persistencia: {storage} · Workspace: {workspace_id}")
     except Exception as exc:
         st.error(f"No se pudo inicializar el CRM; no se guardó información: {exc}")
