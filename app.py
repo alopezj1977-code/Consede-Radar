@@ -16,6 +16,7 @@ import streamlit as st
 from core import load_config, run, ConfigError, identify_columns
 from radar_ui import render_radar_ui
 from mailing_ui import render_mailing_ui
+from executive_front import apply_executive_theme
 
 
 # ============================================================
@@ -150,6 +151,9 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# Sistema visual oficial CONSEDE / 4MSFTS. Solo presentación.
+apply_executive_theme()
 
 
 # ============================================================
