@@ -183,15 +183,49 @@ def read_source(uploaded_file):
         return None
 
 
-def make_need_evidence(enabled, storage, fleet, technology, urgency):
-    if not enabled:
+def read_need_evidence(uploaded_file, cfg):
+    """Carga evidencia comercial por ID estable; nunca propaga valores entre empresas."""
+    if uploaded_file is None:
         return None
-    return {
-        "almacenamiento": int(storage),
-        "flota": int(fleet),
-        "tecnologia": int(technology),
-        "urgencia": int(urgency),
+    evidence_df = read_source(uploaded_file)
+    if evidence_df is None or evidence_df.empty:
+        raise ConfigError("El archivo de evidencia está vacío o no pudo leerse.")
+    mapping = identify_columns(evidence_df)
+    id_col = mapping.get("id")
+    if not id_col:
+        raise ConfigError("El archivo de evidencia debe incluir una columna ID.")
+    aliases = {
+        "almacenamiento": ["almacenamiento", "storage"],
+        "flota": ["flota", "fleet"],
+        "tecnologia": ["tecnologia", "tecnología", "technology"],
+        "urgencia": ["urgencia", "urgencia_estacionalidad", "urgency"],
     }
+    normalized = {str(c).strip().casefold(): c for c in evidence_df.columns}
+    cols = {}
+    for key, names in aliases.items():
+        col = next((normalized[n.casefold()] for n in names if n.casefold() in normalized), None)
+        if not col:
+            raise ConfigError(f"Falta la columna de evidencia: {key}")
+        cols[key] = col
+    allowed = set(cfg["need"]["scale"])
+    result = {}
+    for _, row in evidence_df.iterrows():
+        company_id = str(row[id_col]).strip()
+        if not company_id or company_id.casefold() in {"nan", "none"}:
+            raise ConfigError("Hay una fila de evidencia sin ID.")
+        if company_id in result:
+            raise ConfigError(f"ID duplicado en archivo de evidencia: {company_id}")
+        values = {}
+        for key, col in cols.items():
+            try:
+                value = int(float(row[col]))
+            except (TypeError, ValueError):
+                raise ConfigError(f"Valor inválido en {key} para ID {company_id}.")
+            if value not in allowed:
+                raise ConfigError(f"{key} para ID {company_id} debe pertenecer a {sorted(allowed)}.")
+            values[key] = value
+        result[company_id] = values
+    return result
 
 
 def add_identity_columns(df):
@@ -343,37 +377,13 @@ with st.sidebar:
 
     st.divider()
     st.header("🧠 Necesidad")
-    need_enabled = st.checkbox(
-        "Capturar evidencia comercial",
-        value=False,
-        help="Sin evidencia, Score_Necesidad = 0. No se infiere desde DENUE.",
+    need_evidence_file = st.file_uploader(
+        "Evidencia comercial por empresa (CSV/XLSX)",
+        type=["csv", "xlsx"],
+        key="need_evidence_file",
+        help="Debe incluir ID, almacenamiento, flota, tecnologia y urgencia. Cada fila corresponde a una empresa.",
     )
-
-    need_values = CFG["need"]["scale"]
-    if need_enabled:
-        storage = st.select_slider(
-            "Almacenamiento",
-            options=need_values,
-            value=0,
-        )
-        fleet = st.select_slider(
-            "Flota",
-            options=need_values,
-            value=0,
-        )
-        technology = st.select_slider(
-            "Tecnología",
-            options=need_values,
-            value=0,
-        )
-        urgency = st.select_slider(
-            "Urgencia / estacionalidad",
-            options=need_values,
-            value=0,
-        )
-    else:
-        storage = fleet = technology = urgency = 0
-        st.info("Sin evidencia comercial → Score_Necesidad = 0")
+    st.caption("Sin evidencia individual validada → Score_Necesidad = 0. Nunca se replica una señal a toda la base.")
 
     st.divider()
     st.header("📂 Fuente DENUE / Base")
@@ -424,21 +434,22 @@ if execute:
         or datetime.datetime.now().strftime("CONCEDE-%Y%m%d-%H%M%S")
     )
 
-    need_evidence = make_need_evidence(
-        need_enabled,
-        storage,
-        fleet,
-        technology,
-        urgency,
-    )
-
     try:
+        need_evidence_by_id = read_need_evidence(need_evidence_file, CFG)
+        if need_evidence_by_id is not None:
+            base_id_col = identify_columns(df).get("id")
+            if not base_id_col:
+                raise ConfigError("La base principal debe incluir ID para aplicar evidencia individual.")
+            base_ids = set(df[base_id_col].astype(str).str.strip())
+            unknown_ids = sorted(set(need_evidence_by_id) - base_ids)
+            if unknown_ids:
+                raise ConfigError(f"El archivo de evidencia contiene IDs que no existen en la base: {unknown_ids[:10]}")
         result, metrics = run(
             df=df,
             cfg=CFG,
             selected_entities=effective_entities,
             run_id=run_id,
-            need_evidence=need_evidence,
+            need_evidence_by_id=need_evidence_by_id,
             employee_minimum=int(employee_minimum),
             employee_maximum=employee_maximum,
         )
@@ -747,15 +758,14 @@ with tab3:
         "solo cambia cuando existe evidencia comercial explícita."
     )
 
-    need_score = float(result["Score_Necesidad"].iloc[0]) if len(result) else 0.0
+    need_score = float(result["Score_Necesidad"].mean()) if len(result) else 0.0
+    evidence_count = int((result["Score_Necesidad"] > 0).sum()) if len(result) else 0
 
-    d1, d2, d3, d4 = st.columns(4)
-    d1.metric("Almacenamiento", f"{storage}")
-    d2.metric("Flota", f"{fleet}")
-    d3.metric("Tecnología", f"{technology}")
-    d4.metric("Urgencia", f"{urgency}")
+    d1, d2 = st.columns(2)
+    d1.metric("Empresas con evidencia individual", f"{evidence_count:,}")
+    d2.metric("Score Necesidad promedio", f"{need_score:.2f}")
 
-    st.metric("Score Necesidad V3", f"{need_score:.2f}")
+    st.caption("Los valores de necesidad se asignan exclusivamente por ID; las empresas sin evidencia conservan Score_Necesidad = 0.")
 
     st.markdown("#### Capacidad Propia P0.4")
 
