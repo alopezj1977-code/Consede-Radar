@@ -16,7 +16,7 @@ import streamlit as st
 from core import load_config, run, ConfigError, identify_columns
 from radar_ui import render_radar_ui
 from mailing_ui import render_mailing_ui
-from executive_front import apply_executive_theme
+from executive_front import apply_executive_theme, render_command_center
 
 
 # ============================================================
@@ -282,33 +282,7 @@ def priority_counts(df):
     }
 
 
-# ============================================================
-# ENCABEZADO
-# ============================================================
-
-st.markdown(
-    f"""
-    <div class="hero">
-        <h1>CONCEDE | Motor de Generación de Demanda</h1>
-        <p>Motor V3 · UI ejecutiva · {len(ENTIDADES)} entidades · Score / Prioridad / Valor Potencial separados</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-top1, top2, top3 = st.columns([2.2, 1.2, 1.2])
-with top1:
-    st.markdown(
-        '<div class="status-ok"><b>Entorno de Pruebas</b> · Branch motor-v3 · Motor 3.0.0-FINAL</div>',
-        unsafe_allow_html=True,
-    )
-with top2:
-    st.caption("Modo")
-    st.write("**Ejecución V3**")
-with top3:
-    st.caption("Reglas")
-    st.write("**Sin fallbacks silenciosos**")
-
+# Centro de mando ejecutivo: referencia visual aprobada 4MSFTS.\n# Los indicadores se alimentan exclusivamente de métricas reales de la corrida.\n
 
 # ============================================================
 # SIDEBAR — CONFIGURACIÓN DE CORRIDA
@@ -488,6 +462,7 @@ if execute:
 result = st.session_state.concede_result
 metrics = st.session_state.concede_metrics
 
+render_command_center(metrics)
 
 # ============================================================
 # SIN CORRIDA
