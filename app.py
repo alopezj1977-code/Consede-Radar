@@ -16,6 +16,7 @@ import streamlit as st
 from core import load_config, run, ConfigError, identify_columns
 from radar_ui import render_radar_ui
 from mailing_ui import render_mailing_ui
+from crm_ui import render_crm_ui
 
 
 # ============================================================
@@ -560,7 +561,7 @@ st.caption(
 # TABS EJECUTIVOS
 # ============================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
     [
         "📋 Matriz de Priorización",
         "📊 Gráficos & Dispersión",
@@ -568,6 +569,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
         "⚙️ Configuración & Diagnóstico",
         "🛰️ Radar / Expediente",
         "📨 Mailing",
+        "🤝 CRM Comercial",
     ]
 )
 
@@ -871,6 +873,9 @@ with tab5:
 
 with tab6:
     render_mailing_ui(result, metrics, CFG)
+
+with tab7:
+    render_crm_ui(result)
 
 
 # ============================================================
