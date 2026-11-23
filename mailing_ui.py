@@ -117,7 +117,7 @@ def render_mailing_ui(result_df=None, metrics=None, config=None):
     storage_error = None
     persistent_neon = False
 
-    if "concede_mail_store_loaded" not in st.session_state:
+    if not st.session_state.get("concede_mail_store_loaded", False):
         try:
             contacts, draft, persistent_neon = _initialize_store(mail_config)
             st.session_state["concede_mail_contacts"] = contacts
@@ -176,7 +176,9 @@ def render_mailing_ui(result_df=None, metrics=None, config=None):
         upload = st.file_uploader(
             "Importar contactos (CSV)", type=["csv"], key="concede_mail_contacts_upload"
         )
-        if upload is not None and st.button("Validar e importar contactos", type="primary"):
+        if upload is not None and st.button(
+            "Validar e importar contactos", type="primary", disabled=not persistent_neon
+        ):
             try:
                 parsed = _read_contacts(upload)
                 upsert_contacts(workspace_id, parsed.to_dict("records"))
@@ -233,7 +235,7 @@ def render_mailing_ui(result_df=None, metrics=None, config=None):
                     use_container_width=True,
                     hide_index=True,
                 )
-            if st.button("Guardar borrador", type="primary"):
+            if st.button("Guardar borrador", type="primary", disabled=not persistent_neon):
                 if not selected:
                     st.error("Selecciona al menos un destinatario.")
                 elif not subject.strip() or not body.strip():
@@ -296,6 +298,11 @@ def render_mailing_ui(result_df=None, metrics=None, config=None):
                 "El envío ocurre solo al pulsar el botón final. "
                 "Los destinatarios se envían en copia oculta (BCC)."
             )
+            if not persistent_neon:
+                st.error(
+                    "Envío bloqueado: Mailing requiere persistencia Neon activa. "
+                    "No se permite operar campañas desde la base SQLite local."
+                )
             approved = st.checkbox(
                 "Apruebo expresamente el contenido y la lista completa de destinatarios "
                 "para enviar desde C@4msfts.com.",
@@ -307,7 +314,7 @@ def render_mailing_ui(result_df=None, metrics=None, config=None):
             if st.button(
                 "Enviar campaña aprobada",
                 type="primary",
-                disabled=(not approved or not token),
+                disabled=(not approved or not token or not persistent_neon),
             ):
                 try:
                     allowed, blocked = validate_campaign_recipients(
