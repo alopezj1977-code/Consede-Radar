@@ -41,7 +41,7 @@ def render_crm_ui(result_df):
 
     mapping = identify_columns(result_df) if isinstance(result_df, pd.DataFrame) else {}
     id_col = mapping.get("id")
-    name_col = mapping.get("name") or mapping.get("razon")
+    name_col = mapping.get("nom_estab") or mapping.get("raz_social")
     if result_df is None or result_df.empty or not id_col or not name_col:
         st.warning("Ejecuta una corrida V3 con ID DENUE y nombre de empresa reconocibles para iniciar el seguimiento.")
         return
