@@ -17,6 +17,7 @@ from core import load_config, run, ConfigError, identify_columns
 from radar_ui import render_radar_ui
 from mailing_ui import render_mailing_ui
 from crm_ui import render_crm_ui
+from executive_front import apply_executive_theme
 
 
 # ============================================================
@@ -151,6 +152,10 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+# Sistema visual oficial CONSEDE / 4MSFTS.
+# Solo presentación: no interviene en scoring, datos ni persistencia.
+apply_executive_theme()
 
 
 # ============================================================
